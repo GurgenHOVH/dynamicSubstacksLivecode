@@ -1,0 +1,91 @@
+script "exampleMainStackCode"
+
+local sDynamicStacks
+
+on preOpenStack
+   loadSubstacks
+end preOpenStack
+
+----------------------------------------------------------
+-- DESCRIPTION
+--         Use this to load all SCRIPT ONLY stacks from 'substacks' folder
+-- CHANGES
+--          11/17/2016: Gurgen - created 
+-- NOTES
+--           Make shure your script only stacks beggining with 'script "<your script only stack name>"'
+--           Make shure your 'substacks' folder is in the same folder with your MainStack file
+--           Your changes on substack scripts will be updated every time when to save you project
+--           If you have substacks already loaded, the code will replace them with newer versionn from 'substacks' folder
+--           The code will work only when you are on development mode
+----------------------------------------------------------
+command loadSubstacks
+   -- ONLY if development
+   if the environment is "Development" then
+      -- Get the substacks folder path
+      put the effective filename of this stack into tSubstacksPath
+      set the itemDel to slash
+      delete last item of tSubstacksPath
+      set the itemDel to comma
+      put "/substacks/"  after tSubstacksPath
+      
+      -- Can't find the 'substacks' folder, so nothing to do there
+      if there is no folder tSubstacksPath then exit loadSubstacks
+      
+      -- Get the files on folder and filter them to make shure we are loading livecode stacks
+      put files(tSubstacksPath) into tSubstacks
+      filter tSubstacks with "*.livecode"
+      
+      -- Loop and add to project
+      repeat for each line tSubstack in tSubstacks
+         -- Substack full path
+         put tSubstacksPath & tSubstack into tStackToUse
+         
+         -- Substack short name
+         put the short name of stack tStackToUse into tStackName
+         
+         -- If exists older version, just replace
+         if there is stack tStackName then
+            delete stack tStackName
+         end if
+         
+         -- Load the substack
+         set the mainStack of stack tStackToUse to me
+         
+         -- Save additional info to save the chnages after
+         put tStackToUse into sDynamicStacks[tStackName]
+      end repeat
+      
+   end if
+end loadSubstacks
+
+
+----------------------------------------------------------
+-- DESCRIPTION
+--         This will work every time when developer want to save the project,
+--          it will save all changes on loaded substacks into script only files
+-- CHANGES
+--          11/17/2016: Gurgen - created 
+----------------------------------------------------------
+on saveStackRequest
+   -- ONLY works in development mode
+   if the environment is "Development" then
+      -- Loop all loaded substacks and save the changes
+      repeat for each key tStack in sDynamicStacks
+         put the script of stack tStack into tScript
+         
+         -- Livecode replacing the header info every time when load the substack,
+         -- so if we want to be able to open the substack twice we need to add this header
+         if the first line of tScript contains tStack then
+            replace the first line of tScript with ("script " & quote & tStack & quote & cr) in tStack
+         else
+            put ("script " & quote & tStack & quote & cr)  before tScript
+         end if
+         
+         -- Finaly save to file
+         put tScript into URL("file:" & sDynamicStacks[tStack])
+      end repeat
+   end if
+   
+   -- Make abble Livecode to do his work on saving
+   pass saveStackRequest
+end saveStackRequest
